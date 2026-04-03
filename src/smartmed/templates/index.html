@@ -1,77 +1,220 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
+	<title>SmartMed 攝影機管理系統</title>
 	<style>
-		.container {
-			text-align: center;
-			margin-top: 50px;
-			font-family: Arial;
+		:root {
+			--primary: #2563eb;
+			--success: #16a34a;
+			--danger: #dc2626;
+			--bg: #f8fafc;
 		}
 
-		.video-box {
-			width: 640px;
-			height: 480px;
-			border: 2px solid #ccc;
-			margin: 20px auto;
-			background: #000;
+		body {
+			font-family: 'Segoe UI', system-ui, sans-serif;
+			background: var(--bg);
+			display: flex;
+			justify-content: center;
+			padding: 40px;
+			margin: 0;
+		}
+
+		.card {
+			background: white;
+			padding: 2rem;
+			border-radius: 12px;
+			box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+			width: 100%;
+			max-width: 700px;
+			text-align: center;
+		}
+
+		h1 {
+			color: #1e293b;
+			margin-bottom: 1.5rem;
+		}
+
+		.controls {
+			display: flex;
+			gap: 10px;
+			justify-content: center;
+			align-items: center;
+			margin-bottom: 20px;
+			flex-wrap: wrap;
+		}
+
+		select {
+			padding: 8px 12px;
+			border-radius: 6px;
+			border: 1px solid #cbd5e1;
+			font-size: 14px;
+			min-width: 200px;
 		}
 
 		button {
-			padding: 10px 25px;
-			font-size: 16px;
+			padding: 8px 20px;
+			border-radius: 6px;
+			border: none;
 			cursor: pointer;
-			margin: 5px;
+			font-weight: 600;
+			transition: opacity 0.2s;
 		}
 
-		.start {
-			background-color: #28a745;
+		.btn-refresh {
+			background: #64748b;
 			color: white;
-			border: none;
 		}
 
-		.stop {
-			background-color: #dc3545;
+		.btn-start {
+			background: var(--success);
 			color: white;
-			border: none;
+		}
+
+		.btn-stop {
+			background: var(--danger);
+			color: white;
+		}
+
+		button:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.video-container {
+			width: 100%;
+			aspect-ratio: 16/9;
+			background: #0f172a;
+			border-radius: 8px;
+			overflow: hidden;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			position: relative;
+		}
+
+		#stream {
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+			display: none;
+		}
+
+		.status-overlay {
+			color: #94a3b8;
+			font-size: 14px;
+		}
+
+		.badge {
+			padding: 4px 12px;
+			border-radius: 20px;
+			font-size: 12px;
+			margin-top: 10px;
+			display: inline-block;
+		}
+
+		.online {
+			background: #dcfce7;
+			color: #166534;
 		}
 	</style>
 </head>
 
 <body>
-	<div class="container">
-		<h1>SmartMed 攝影機控制</h1>
 
-		<div class="video-box">
-			<img id="stream" src="" style="width: 100%; display: none;">
+	<div class="card">
+		<h1>SmartMed Camera</h1>
+
+		<div class="controls">
+			<select id="cameraSelect">
+				<option value="">正在初始化攝影機清單...</option>
+			</select>
+			<button class="btn-refresh" onclick="refreshList()">🔄 重新整理</button>
 		</div>
 
-		<button class="start" onclick="controlCamera('start')">啟動攝影機</button>
-		<button class="stop" onclick="controlCamera('stop')">停止攝影機</button>
+		<div class="video-container">
+			<img id="stream" src="" alt="Video Stream">
+			<div id="placeholder" class="status-overlay">攝影機尚未啟動</div>
+		</div>
+
+		<div class="controls" style="margin-top: 20px;">
+			<button id="startBtn" class="btn-start" onclick="toggleCamera('start')">▶ 啟動串流</button>
+			<button id="stopBtn" class="btn-stop" onclick="toggleCamera('stop')" disabled>⏹ 停止</button>
+		</div>
+
+		<div id="activeInfo" style="display: none;">
+			<span class="badge online" id="currentCamName"></span>
+		</div>
 	</div>
 
 	<script>
-		function controlCamera(action) {
-			const img = document.getElementById('stream');
+		const cameraSelect = document.getElementById('cameraSelect');
+		const streamImg = document.getElementById('stream');
+		const placeholder = document.getElementById('placeholder');
+		const startBtn = document.getElementById('startBtn');
+		const stopBtn = document.getElementById('stopBtn');
+		const activeInfo = document.getElementById('activeInfo');
 
-			fetch('/' + action)
-				.then(response => response.json())
-				.then(data => {
-					if (action === 'start') {
-						// 加上時間戳記防止瀏覽器快取舊畫面
-						img.src = "/video_feed?t=" + new Date().getTime();
-						img.style.display = 'block';
-					} else {
-						img.src = "";
-						img.style.display = 'none';
-					}
-					console.log(data.status);
+		// 初始化載入
+		window.onload = refreshList;
+
+		async function refreshList() {
+			cameraSelect.innerHTML = '<option value="">掃描中...</option>';
+			try {
+				const res = await fetch('/list');
+				const data = await res.json();
+				cameraSelect.innerHTML = '';
+
+				if (!data.cameras || data.cameras.length === 0) {
+					cameraSelect.innerHTML = '<option value="">找不到可用攝影機</option>';
+					return;
+				}
+
+				data.cameras.forEach(cam => {
+					const opt = document.createElement('option');
+					opt.value = cam.id;
+					opt.textContent = cam.name; // 顯示 pygrabber 抓到的名稱
+					cameraSelect.appendChild(opt);
 				});
+			} catch (err) {
+				cameraSelect.innerHTML = '<option value="">連線錯誤</option>';
+			}
+		}
+
+		async function toggleCamera(action) {
+			if (action === 'start') {
+				const deviceId = cameraSelect.value;
+				if (deviceId === "") return alert("請先選擇攝影機");
+
+				const res = await fetch(`/start?device_id=${deviceId}`);
+				const data = await res.json();
+
+				if (data.status === 'started' || data.status === 'already running') {
+					streamImg.src = "/video_feed?t=" + Date.now();
+					streamImg.style.display = 'block';
+					placeholder.style.display = 'none';
+
+					startBtn.disabled = true;
+					stopBtn.disabled = false;
+					cameraSelect.disabled = true;
+					activeInfo.style.display = 'block';
+					document.getElementById('currentCamName').textContent = `正在使用: ${cameraSelect.options[cameraSelect.selectedIndex].text}`;
+				}
+			} else {
+				await fetch('/stop');
+				streamImg.src = "";
+				streamImg.style.display = 'none';
+				placeholder.style.display = 'block';
+
+				startBtn.disabled = false;
+				stopBtn.disabled = true;
+				cameraSelect.disabled = false;
+				activeInfo.style.display = 'none';
+			}
 		}
 	</script>
+
 </body>
 
 </html>

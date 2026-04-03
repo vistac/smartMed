@@ -1,11 +1,15 @@
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
+from pygrabber.dshow_graph import FilterGraph
 import cv2
+import threading
 
 app = Flask(__name__)
 camera = cv2.VideoCapture(1)
 port = 5000
 host = "0.0.0.0"
 DEBUG = True
+camera = None
+camera_lock = threading.Lock()
 
 
 def gen_frames():
@@ -20,47 +24,82 @@ def gen_frames():
 
 
 def get_available_cameras():
-  """掃描系統中可用的攝影機索引"""
-  available = []
-  # 掃描前 5 個索引 (通常電腦不會超過 5 個攝影機)
-  for i in range(5):
-    cap = cv2.VideoCapture(i)
-    if cap.isOpened():
-      available.append(i)
-      cap.release()
-  return available
+  """使用 pygrabber 獲取 Windows 攝影機名稱"""
+  try:
+    devices = FilterGraph().get_input_devices()
+    return [{"id": i, "name": name} for i, name in enumerate(devices)]
+  except Exception:
+    return []
 
 
 @app.route("/")
 def index():
-  user_name = "Vistac"
-  return render_template("index.html", user_name=user_name)
-  # return "<h1>Webcam Stream</h1><img src='/video_feed' width='640'>"
-  # return render_template('index.html')
+  return render_template("index.html")
+
+
+@app.route("/list")
+def list_cameras():
+  return jsonify({"cameras": get_available_cameras()})
 
 
 @app.route("/start")
 def start_camera():
   global camera
-  if camera is None:
-    camera = cv2.VideoCapture(0)  # 打開預設攝影機
-    return jsonify({"status": "Camera started"})
-  return jsonify({"status": "Camera already running"})
+  device_id = request.args.get("device_id", default=0, type=int)
+
+  with camera_lock:
+    if camera is not None:
+      # 如果已經有開啟的攝影機，先釋放舊的
+      camera.release()
+      camera = None
+
+    try:
+      # 建立新的攝影機實例
+      new_cam = cv2.VideoCapture(device_id, cv2.CAP_DSHOW)  # 使用 DSHOW 在 Windows 更快
+      if not new_cam.isOpened():
+        return jsonify({"status": "error", "message": "無法開啟攝影機"}), 500
+
+      camera = new_cam
+      return jsonify({"status": "started", "device_id": device_id})
+    except Exception as e:
+      return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/stop")
 def stop_camera():
   global camera
-  if camera is not None:
-    camera.release()  # 釋放攝影機資源
-    camera = None
-    return jsonify({"status": "Camera stopped"})
-  return jsonify({"status": "Camera not running"})
+  with camera_lock:
+    if camera is not None:
+      camera.release()
+      camera = None
+      return jsonify({"status": "stopped"})
+    return jsonify({"status": "already stopped"})
 
 
 @app.route("/video_feed")
 def video_feed():
-  return Response(gen_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
+  def generate_frames():
+    global camera
+    while True:
+      with camera_lock:
+        if camera is None or not camera.isOpened():
+          break
+        success, frame = camera.read()
+
+      if not success:
+        break
+
+      ret, buffer = cv2.imencode(".jpg", frame)
+      if not ret:
+        continue
+
+      yield (
+        b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
+      )
+
+  return Response(
+    generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
+  )
 
 
 def main() -> None:
