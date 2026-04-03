@@ -1,0 +1,20 @@
+[project]
+dependencies = [
+    "flask>=3.1.3",
+    "opencv-python>=4.13.0.92",
+    "pyinstaller>=6.19.0",
+]
+description = "Add your description here"
+name = "smartmed"
+readme = "README.md"
+requires-python = ">=3.12"
+version = "0.1.0"
+
+[project.scripts]
+cv = "smartmed.cv:openCamera"
+smartmed = "smartmed.main:main"
+webcam = "smartmed.app:main"
+
+[build-system]
+build-backend = "uv_build"
+requires = ["uv_build>=0.9.15,<0.10.0"]
