@@ -15,6 +15,7 @@ version = "0.1.0"
 cv = "smartmed.cv:openCamera"
 smartmed = "smartmed.main:main"
 webcam = "smartmed.app:main"
+dev = "smartmed.dev:run_dev" 
 
 [build-system]
 build-backend = "uv_build"

@@ -1,10 +1,11 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 import cv2
 
 app = Flask(__name__)
 camera = cv2.VideoCapture(1)
 port = 5000
 host = '0.0.0.0'
+DEBUG = True
 
 
 def gen_frames():
@@ -27,6 +28,25 @@ def index():
     # return render_template('index.html')
 
 
+@app.route('/start')
+def start_camera():
+    global camera
+    if camera is None:
+        camera = cv2.VideoCapture(0)  # 打開預設攝影機
+        return jsonify({"status": "Camera started"})
+    return jsonify({"status": "Camera already running"})
+
+
+@app.route('/stop')
+def stop_camera():
+    global camera
+    if camera is not None:
+        camera.release()  # 釋放攝影機資源
+        camera = None
+        return jsonify({"status": "Camera stopped"})
+    return jsonify({"status": "Camera not running"})
+
+
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -34,7 +54,7 @@ def video_feed():
 
 def main() -> None:
     print('method webcam-app main.')
-    app.run(host=host, port=port)
+    app.run(host=host, port=port, debug=DEBUG)
 
 
 if __name__ == '__main__':

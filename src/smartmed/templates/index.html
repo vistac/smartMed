@@ -5,11 +5,73 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Document</title>
+	<style>
+		.container {
+			text-align: center;
+			margin-top: 50px;
+			font-family: Arial;
+		}
+
+		.video-box {
+			width: 640px;
+			height: 480px;
+			border: 2px solid #ccc;
+			margin: 20px auto;
+			background: #000;
+		}
+
+		button {
+			padding: 10px 25px;
+			font-size: 16px;
+			cursor: pointer;
+			margin: 5px;
+		}
+
+		.start {
+			background-color: #28a745;
+			color: white;
+			border: none;
+		}
+
+		.stop {
+			background-color: #dc3545;
+			color: white;
+			border: none;
+		}
+	</style>
 </head>
 
 <body>
-	<h1>Webcam Stream</h1>
-	<!-- <img src="/video_feed" width="640"> -->
+	<div class="container">
+		<h1>SmartMed 攝影機控制</h1>
+
+		<div class="video-box">
+			<img id="stream" src="" style="width: 100%; display: none;">
+		</div>
+
+		<button class="start" onclick="controlCamera('start')">啟動攝影機</button>
+		<button class="stop" onclick="controlCamera('stop')">停止攝影機</button>
+	</div>
+
+	<script>
+		function controlCamera(action) {
+			const img = document.getElementById('stream');
+
+			fetch('/' + action)
+				.then(response => response.json())
+				.then(data => {
+					if (action === 'start') {
+						// 加上時間戳記防止瀏覽器快取舊畫面
+						img.src = "/video_feed?t=" + new Date().getTime();
+						img.style.display = 'block';
+					} else {
+						img.src = "";
+						img.style.display = 'none';
+					}
+					console.log(data.status);
+				});
+		}
+	</script>
 </body>
 
 </html>
