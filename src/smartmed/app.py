@@ -20,6 +20,18 @@ def gen_frames():
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 
+def get_available_cameras():
+    """掃描系統中可用的攝影機索引"""
+    available = []
+    # 掃描前 5 個索引 (通常電腦不會超過 5 個攝影機)
+    for i in range(5):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            available.append(i)
+            cap.release()
+    return available
+
+
 @app.route('/')
 def index():
     user_name = "Vistac"
