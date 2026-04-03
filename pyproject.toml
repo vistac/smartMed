@@ -11,6 +11,14 @@ readme = "README.md"
 requires-python = ">=3.12"
 version = "0.1.0"
 
+[tool.ruff]
+line-length = 88
+indent-width = 2
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+
 [project.scripts]
 cv = "smartmed.cv:openCamera"
 smartmed = "smartmed.main:main"
@@ -20,3 +28,8 @@ dev = "smartmed.dev:run_dev"
 [build-system]
 build-backend = "uv_build"
 requires = ["uv_build>=0.9.15,<0.10.0"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.9",
+]

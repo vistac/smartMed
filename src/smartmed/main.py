@@ -1,6 +1,7 @@
-def main()->None:
-    print('method SmartMed Main.')
+def main() -> None:
+  print("method SmartMed Main.")
 
-if __name__ == '__main__':
-    print('entry point.')
-    main()
+
+if __name__ == "__main__":
+  print("entry point.")
+  main()
